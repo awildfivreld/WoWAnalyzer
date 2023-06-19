@@ -26,8 +26,12 @@ class SurgeOfPower extends Analyzer {
   // total SK lightning bolt casts
   skCasts = 0;
 
+  debounce: number;
+
   constructor(options: Options) {
     super(options);
+
+    this.debounce = 0;
     this.active = this.selectedCombatant.hasTalent(TALENTS.SURGE_OF_POWER_TALENT);
     if (!this.active) {
       return;
@@ -67,6 +71,11 @@ class SurgeOfPower extends Analyzer {
     if (!this.selectedCombatant.hasBuff(SPELLS.SURGE_OF_POWER_BUFF.id)) {
       return;
     }
+    // It can happen that two abilities (Such as LB and FrS) cast have the same timestamp, and therefore trigger this listener before the removebuff event is processed.
+    if (this.debounce === event.timestamp) {
+      return;
+    }
+    this.debounce = event.timestamp;
 
     event.meta = event.meta || {};
     event.meta.isEnhancedCast = true;

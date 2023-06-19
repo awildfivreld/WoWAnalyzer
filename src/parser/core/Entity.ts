@@ -212,26 +212,27 @@ class Entity {
   ): Map<number, number> {
     const buffTimesAtApplication: Map<number, number> = new Map<number, number>();
     const sortedApplicationTimestamps: number[] = this.getBuffHistory(spellId, sourceId)
-      .map((buffEvent) => buffEvent.timestamp)
+      .map((buffEvent) => buffEvent.refreshHistory.at(-1) || buffEvent.timestamp)
       .sort((a, b) => a - b);
+
     if (sortedApplicationTimestamps.length === 0) {
       return buffTimesAtApplication;
     }
     let lastApplicationTimestamp: number = sortedApplicationTimestamps[0];
     let buffTimeAtLastApplication: number = baseBuffLength;
-    buffTimesAtApplication.set(lastApplicationTimestamp, 0);
+    buffTimesAtApplication.set(lastApplicationTimestamp, buffTimeAtLastApplication);
     for (let i = 1; i < sortedApplicationTimestamps.length; i += 1) {
       const timeDiffBetweenApplications = sortedApplicationTimestamps[i] - lastApplicationTimestamp;
       const buffAmountAtCurrentApplication = Math.max(
         0,
         buffTimeAtLastApplication - timeDiffBetweenApplications,
       );
-      buffTimesAtApplication.set(sortedApplicationTimestamps[i], buffAmountAtCurrentApplication);
       lastApplicationTimestamp = sortedApplicationTimestamps[i];
       buffTimeAtLastApplication = Math.min(
         buffAmountAtCurrentApplication + baseBuffLength,
         maxBuffLength,
       );
+      buffTimesAtApplication.set(sortedApplicationTimestamps[i], buffTimeAtLastApplication);
     }
     return buffTimesAtApplication;
   }
@@ -259,6 +260,7 @@ class Entity {
       maxBuffLength,
       sourceId,
     );
+    console.log('buffapptimes', buffApplicationTimes);
     const keys: number[] = Array.from(buffApplicationTimes.keys()).sort((a, b) => a - b);
     if (keys.length === 0) {
       return 0;

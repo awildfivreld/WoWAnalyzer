@@ -33,6 +33,10 @@ import ElementalOrbit from '../shared/talents/ElementalOrbit';
 import EarthenHarmony from '../restoration/modules/talents/EarthenHarmony';
 import CallToDominance from 'parser/retail/modules/items/dragonflight/CallToDominance';
 
+import Guide from './Guide';
+import ElectrifiedShocks from './modules/talents/ElectrifiedShocks';
+import SpenderWindow from './modules/features/SpenderWindow';
+
 class CombatLogParser extends CoreCombatLogParser {
   static specModules = {
     // Features
@@ -43,6 +47,7 @@ class CombatLogParser extends CoreCombatLogParser {
     cancelledCasts: CancelledCasts,
     alwaysBeCasting: AlwaysBeCasting,
     subOptimalChainLightning: SubOptimalChainLightning,
+    spenderWindow: SpenderWindow,
 
     // Talents
     aftershock: Aftershock,
@@ -61,6 +66,7 @@ class CombatLogParser extends CoreCombatLogParser {
     icefury: Icefury,
     stormkeeper: Stormkeeper,
     ascendance: Ascendance,
+    electrifiedShocks: ElectrifiedShocks,
 
     maelstromTracker: MaelstromTracker,
     maelstromDetails: MaelstromDetails,
@@ -70,6 +76,8 @@ class CombatLogParser extends CoreCombatLogParser {
     astralShift: AstralShift,
     callToDominance: CallToDominance,
   };
+
+  static guide = Guide;
 }
 
 export default CombatLogParser;

@@ -14,6 +14,8 @@ import BoringSpellValueText from 'parser/ui/BoringSpellValueText';
 import Statistic from 'parser/ui/Statistic';
 import { STATISTIC_ORDER } from 'parser/ui/StatisticBox';
 import { TALENTS_SHAMAN } from 'common/TALENTS';
+import { explanationAndDataSubsection } from 'interface/guide/components/ExplanationRow';
+import uptimeBarSubStatistic from 'parser/ui/UptimeBarSubStatistic';
 
 class FlameShock extends EarlyDotRefreshesAnalyzer {
   static dependencies = {
@@ -79,6 +81,23 @@ class FlameShock extends EarlyDotRefreshesAnalyzer {
     if (target && !target.hasBuff(SPELLS.FLAME_SHOCK.id)) {
       this.badLavaBursts += 1;
     }
+  }
+
+  get guideSubsection() {
+    const description = <>FS</>;
+
+    const history = this.enemies.getDebuffHistory(SPELLS.FLAME_SHOCK.id);
+
+    const data = (
+      <>
+        {uptimeBarSubStatistic(this.owner.fight, {
+          spells: [SPELLS.FLAME_SHOCK],
+          uptimes: history,
+        })}
+      </>
+    );
+
+    return explanationAndDataSubsection(description, data);
   }
 
   suggestions(when: When) {

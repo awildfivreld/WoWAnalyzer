@@ -144,5 +144,8 @@
     "moduleNameMapper": {
       "^@lingui/loader!.*$": "<rootDir>/linguiMessageMock.js"
     }
-  }
+  },
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "awildfivreld <12049229+awildfivreld@users.noreply.github.com>"
 }

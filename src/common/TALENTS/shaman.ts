@@ -391,7 +391,7 @@ const talents = createTalentList({
     ],
   },
   ELECTRIFIED_SHOCKS_TALENT: {
-    id: 382086,
+    id: 382089,
     name: 'Electrified Shocks',
     icon: 'inv_offhand_1h_artifactdoomhammer_d_02',
     maxRanks: 1,
