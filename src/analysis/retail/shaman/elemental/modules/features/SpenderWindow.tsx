@@ -1,18 +1,22 @@
 import SPELLS from 'common/SPELLS';
 import TALENTS from 'common/TALENTS/shaman';
+import { Talent } from 'common/TALENTS/types';
 import { formatDuration } from 'common/format';
 import { SpellIcon, SpellLink, TooltipElement } from 'interface';
 import { explanationAndDataSubsection } from 'interface/guide/components/ExplanationRow';
 import Analyzer, { Options, SELECTED_PLAYER } from 'parser/core/Analyzer';
-import Events, { CastEvent, FightEndEvent } from 'parser/core/Events';
+import Events, { CastEvent } from 'parser/core/Events';
 import Enemies from 'parser/shared/modules/Enemies';
 
-type SpenderWindowType = {
+interface ActiveSpenderWindow {
   timestamp: number;
   motePresent: boolean;
-  elshocksPresent?: boolean;
-  sopUse?: CastEvent;
-};
+}
+
+interface FinishedSpenderWindow extends ActiveSpenderWindow {
+  elshocksPresent: boolean;
+  sopUse: CastEvent;
+}
 
 const SOP_SPENDERS = [
   SPELLS.LIGHTNING_BOLT,
@@ -33,77 +37,92 @@ class SpenderWindow extends Analyzer {
     enemies: Enemies,
   };
 
+  enabled: boolean = true;
+
   protected enemies!: Enemies;
 
-  sopDebounce: number;
+  sopDebounceTs: number;
 
-  spenderWindows: SpenderWindowType[];
+  activeSpenderWindow: ActiveSpenderWindow | null;
+  spenderWindows: FinishedSpenderWindow[];
+
+  _stSpender: Talent = TALENTS.EARTH_SHOCK_TALENT;
 
   constructor(options: Options) {
     super(options);
 
+    this.activeSpenderWindow = null;
     this.spenderWindows = [];
-    this.sopDebounce = 0;
+    this.sopDebounceTs = 0;
 
-    this.addEventListener(
-      Events.cast.by(SELECTED_PLAYER).spell(TALENTS.ELEMENTAL_BLAST_TALENT),
-      this.onEB,
-    );
-    this.addEventListener(Events.cast.by(SELECTED_PLAYER).spell(SOP_SPENDERS), this.onSopSpender);
-    this.addEventListener(Events.fightend, this.onFightEnd);
-  }
-
-  onFightEnd(event: FightEndEvent) {
-    if (this.spenderWindows[this.spenderWindows.length - 1].sopUse === undefined) {
-      // Skip the last (unfinished) window, as it was not completed.
-      this.spenderWindows.pop();
+    if (!this.selectedCombatant.hasTalent(TALENTS.SURGE_OF_POWER_TALENT)) {
+      /* There is no point in tracking this at all if the player doesn't have SoP */
+      this.enabled = false;
+      return;
     }
+
+    if (this.selectedCombatant.hasTalent(TALENTS.ELEMENTAL_BLAST_TALENT)) {
+      this._stSpender = TALENTS.ELEMENTAL_BLAST_TALENT;
+    }
+
+    this.addEventListener(Events.cast.by(SELECTED_PLAYER).spell(this._stSpender), this.onSpender);
+    this.addEventListener(Events.cast.by(SELECTED_PLAYER).spell(SOP_SPENDERS), this.onSopSpender);
   }
 
-  onEB(event: CastEvent) {
-    this.spenderWindows.push({
+  onSpender(event: CastEvent) {
+    if (this.activeSpenderWindow) {
+      /* TODO: Log that the user cast two spenders in a row */
+      return;
+    }
+
+    this.activeSpenderWindow = {
       timestamp: event.timestamp,
       motePresent: this.selectedCombatant.hasBuff(SPELLS.MASTER_OF_THE_ELEMENTS_BUFF.id, null, 100), // EB seems to consume MotE before its CastEvent, so a little buffer is required.
-    });
+    };
   }
 
   onSopSpender(event: CastEvent) {
     // There are bugs in the logs where the removebuff and cast events do not have the same timestamp, adding 100 as buffer seems to fix this.
+    if (!this.activeSpenderWindow) {
+      return;
+    }
     if (!this.selectedCombatant.hasBuff(SPELLS.SURGE_OF_POWER_BUFF.id, null, 100)) {
       return;
     }
     // It can happen that an LB and FrS cast have the same timestamp, and therefore trigger this listener before the removebuff event is processed.
-    if (event.timestamp === this.sopDebounce) {
+    if (event.timestamp === this.sopDebounceTs) {
       return;
     }
-    this.sopDebounce = event.timestamp;
+    this.sopDebounceTs = event.timestamp;
 
-    const sw = this.spenderWindows[this.spenderWindows.length - 1];
-    sw.elshocksPresent =
+    const elshocksPresent =
       this.enemies
         .getEntity(event)
         ?.hasBuff(TALENTS.ELECTRIFIED_SHOCKS_TALENT.id, event.timestamp) || false;
-    sw.sopUse = event;
+
+    this.spenderWindows.push({ ...this.activeSpenderWindow, elshocksPresent, sopUse: event });
   }
 
   get guideSubsection() {
+    if (!this.enabled) {
+      return <></>;
+    }
+
     const explanation = (
       <>
         When you cast your single target spender (
-        <SpellLink spell={TALENTS.ELEMENTAL_BLAST_TALENT} />
-        ), you want to empower it with
-        <SpellLink spell={TALENTS.MASTER_OF_THE_ELEMENTS_TALENT} /> first, then use the{' '}
-        <SpellLink spell={TALENTS.SURGE_OF_POWER_TALENT} /> on something useful (mostly{' '}
-        <SpellLink spell={SPELLS.LIGHTNING_BOLT} /> or{' '}
-        <SpellLink spell={TALENTS.CHAIN_LIGHTNING_TALENT} />
-        ). This mini rotation is called a "spender window".
+        <SpellLink spell={this._stSpender} />
+        ), you want to empower it with as much of your other talents as you can. This mini rotation
+        is called a "spender window".
       </>
     );
 
     const perfectSpenderWindows = this.spenderWindows.filter(
       (w) =>
-        w.motePresent &&
-        w.elshocksPresent &&
+        (w.motePresent ||
+          !this.selectedCombatant.hasTalent(TALENTS.MASTER_OF_THE_ELEMENTS_TALENT)) &&
+        (w.elshocksPresent ||
+          !this.selectedCombatant.hasTalent(TALENTS.ELECTRIFIED_SHOCKS_TALENT)) &&
         GOOD_SOP_SPENDERS.includes(w.sopUse?.ability.guid || 0),
     );
     const spenderWindowsMissingMote = this.spenderWindows.filter((w) => !w.motePresent);
@@ -112,13 +131,13 @@ class SpenderWindow extends Analyzer {
       (w) => !GOOD_SOP_SPENDERS.includes(w.sopUse?.ability.guid || 0),
     );
 
-    const windowTimestamps = (windows: SpenderWindowType[]) => {
+    const windowTimestamps = (windows: FinishedSpenderWindow[]) => {
       return windows
         .map((w) => formatDuration(w.timestamp - this.owner.fight.start_time))
         .join(', ');
     };
 
-    const renderRow = (label: JSX.Element, subWindows: SpenderWindowType[]) => {
+    const renderRow = (label: JSX.Element, subWindows: FinishedSpenderWindow[]) => {
       const windowsPct = subWindows.length / this.spenderWindows.length;
       return (
         <>
@@ -160,20 +179,22 @@ class SpenderWindow extends Analyzer {
           </strong>
         </TooltipElement>
         <br />
-        {renderRow(
-          <>
-            Elemental Blast missing <SpellLink spell={TALENTS.MASTER_OF_THE_ELEMENTS_TALENT} />
-          </>,
-          spenderWindowsMissingMote,
-        )}
+        {this.selectedCombatant.hasTalent(TALENTS.MASTER_OF_THE_ELEMENTS_TALENT) &&
+          renderRow(
+            <>
+              Elemental Blast missing <SpellLink spell={TALENTS.MASTER_OF_THE_ELEMENTS_TALENT} />
+            </>,
+            spenderWindowsMissingMote,
+          )}
         <br />
-        {renderRow(
-          <>
-            <SpellLink spell={TALENTS.SURGE_OF_POWER_TALENT} /> spell missing{' '}
-            <SpellLink spell={TALENTS.ELECTRIFIED_SHOCKS_TALENT} />
-          </>,
-          spenderWindowsMissingElshocks,
-        )}
+        {this.selectedCombatant.hasTalent(TALENTS.ELECTRIFIED_SHOCKS_TALENT) &&
+          renderRow(
+            <>
+              <SpellLink spell={TALENTS.SURGE_OF_POWER_TALENT} /> spell missing{' '}
+              <SpellLink spell={TALENTS.ELECTRIFIED_SHOCKS_TALENT} />
+            </>,
+            spenderWindowsMissingElshocks,
+          )}
         <br />
       </div>
     );

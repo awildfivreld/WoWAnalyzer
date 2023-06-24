@@ -218,6 +218,33 @@ class Enemies extends Entities<Enemy> {
     }
     return history;
   }
+
+  /** Get the longest duration remaining of the spell on any enemy
+   *
+   * @param spellId The spell to check
+   * @param timestamp The timestamp to check at (in ms)
+   * @param baseBuffLength The base duration of the buff (in ms)
+   * @param maxBuffLength The maximum duration of the buff (in ms)
+   *
+   * @returns The longest duration remaining of the spell on any enemy (in ms)
+   */
+  getLongestDurationRemaining(
+    spellId: number,
+    baseBuffLength: number,
+    maxBuffLength: number,
+    timestamp: number,
+  ) {
+    const enemies = this.getEntities();
+    let maxDuration = 0;
+    Object.values(enemies).forEach((enemy) => {
+      maxDuration = Math.max(
+        maxDuration,
+        enemy.getRemainingBuffTimeAtTimestamp(spellId, baseBuffLength, maxBuffLength, timestamp),
+      );
+    });
+
+    return maxDuration;
+  }
 }
 
 export default Enemies;

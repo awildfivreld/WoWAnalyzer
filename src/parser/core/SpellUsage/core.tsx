@@ -20,6 +20,7 @@ export interface UsageInfo {
  * Extension of {@link UsageInfo} that also contains the cast timestamp and what is being checked.
  */
 export interface ChecklistUsageInfo extends UsageInfo {
+  /** What is being checked. Should be something unique between the items in the checklist. */
   check: string;
   timestamp: number;
 }

@@ -18,24 +18,37 @@ import EmbeddedTimelineContainer, {
   SpellTimeline,
 } from 'interface/report/Results/Timeline/EmbeddedTimeline';
 import Casts from 'interface/report/Results/Timeline/Casts';
-import { formatDuration } from 'common/format';
 
 interface SKTimeline {
+  /** The start time (in ms) of the window */
   start: number;
+  /** The end time (in ms) of the window */
   end: number;
+  /** The events that happened inside the window */
   events: CastEvent[];
+  /** The performance of the window */
   performance: QualitativePerformance;
 }
 
 interface SKCast extends SpellCast {
+  /** How much maelstrom the user had when starting the window rotation */
   maelstromOnCast: number;
+  /** How long Flameshock had left when starting the window rotation */
   flameshockDurationOnCast: number;
+  /** How long Electrified shocks had left when starting the window rotation */
   electrifiedShocksDurationOnCast: number;
+  /** If the user had Surge of Power already active when casting SK */
   sopOnCast: boolean;
+  /** If the user had Master of the Elements already active when casting SK */
   moteOnCast: boolean;
+  /** What the user cast between casting SK and consuming the second buff. */
   timeline: SKTimeline;
   _hasStartedRotation: boolean;
 }
+
+const GUIDE_BASE_MAELSTROM_REQUIREMENT = 90;
+const GUIDE_FLAMESHOCK_DURATION_PERFECT = 10000;
+const GUIDE_ELSHOCKS_DURATION_PERFECT = 6000;
 
 class Stormkeeper extends MajorCooldown<SKCast> {
   static dependencies = {
@@ -48,7 +61,7 @@ class Stormkeeper extends MajorCooldown<SKCast> {
   protected enemies!: Enemies;
   protected spellUsable!: SpellUsable;
 
-  activeCooldown: SKCast | null;
+  activeWindow: SKCast | null;
 
   damageDoneByBuffedCasts = 0;
 
@@ -63,15 +76,27 @@ class Stormkeeper extends MajorCooldown<SKCast> {
       Events.removebuff.by(SELECTED_PLAYER).spell(TALENTS.STORMKEEPER_1_ELEMENTAL_TALENT),
       this.onSKFalloff,
     );
-    this.activeCooldown = null;
+    this.activeWindow = null;
   }
 
   onCast(cast: CastEvent) {
-    this.activeCooldown = {
+    this.activeWindow = {
       event: cast,
       maelstromOnCast: this.maelstromTracker.current,
-      flameshockDurationOnCast: this.getActiveFlSDuration(cast),
-      electrifiedShocksDurationOnCast: this.getActiveElShocksDuration(cast),
+      /* Snapshot FS and elshocks here, but these might be overriden later,
+      if the user cast these spells before starting the actual rotation. */
+      flameshockDurationOnCast: this.enemies.getLongestDurationRemaining(
+        SPELLS.FLAME_SHOCK.id,
+        18000,
+        24000,
+        cast.timestamp,
+      ),
+      electrifiedShocksDurationOnCast: this.enemies.getLongestDurationRemaining(
+        TALENTS.ELECTRIFIED_SHOCKS_TALENT.id,
+        9000,
+        9000,
+        cast.timestamp,
+      ),
       sopOnCast: this.selectedCombatant.hasBuff(SPELLS.SURGE_OF_POWER_BUFF.id),
       moteOnCast: this.selectedCombatant.hasBuff(SPELLS.MASTER_OF_THE_ELEMENTS_BUFF.id),
       timeline: {
@@ -85,12 +110,12 @@ class Stormkeeper extends MajorCooldown<SKCast> {
   }
 
   onEvent(event: CastEvent) {
-    if (!this.activeCooldown) {
+    if (!this.activeWindow) {
       return;
     }
 
     if (
-      !this.activeCooldown._hasStartedRotation &&
+      !this.activeWindow._hasStartedRotation &&
       [
         SPELLS.LIGHTNING_BOLT.id,
         TALENTS.CHAIN_LIGHTNING_TALENT.id,
@@ -99,73 +124,36 @@ class Stormkeeper extends MajorCooldown<SKCast> {
         TALENTS.ELEMENTAL_BLAST_TALENT.id,
       ].includes(event.ability.guid)
     ) {
-      this.activeCooldown._hasStartedRotation = true;
+      this.activeWindow._hasStartedRotation = true;
     }
 
-    if (event.ability.guid === SPELLS.FLAME_SHOCK.id && !this.activeCooldown._hasStartedRotation) {
-      this.activeCooldown.flameshockDurationOnCast = 18000;
-      console.log(
-        formatDuration(event.timestamp - this.owner.fight.start_time),
-        'fls',
-        this.activeCooldown.flameshockDurationOnCast,
-      );
+    if (event.ability.guid === SPELLS.FLAME_SHOCK.id && !this.activeWindow._hasStartedRotation) {
+      /* This might be slightly simplified, but if the user cast FS after SK,
+      it won't expire in the window anyway. */
+      this.activeWindow.flameshockDurationOnCast = 18000;
     }
 
     if (
       event.ability.guid === TALENTS.FROST_SHOCK_TALENT.id &&
-      !this.activeCooldown._hasStartedRotation
+      !this.activeWindow._hasStartedRotation
     ) {
-      this.activeCooldown.electrifiedShocksDurationOnCast = 9000;
-      console.log(
-        formatDuration(event.timestamp - this.owner.fight.start_time),
-        'frs',
-        this.activeCooldown.electrifiedShocksDurationOnCast,
-      );
+      /* This might be slightly simplified, but if the user cast FS after SK,
+      it won't expire in the window anyway. */
+      this.activeWindow.electrifiedShocksDurationOnCast = 9000;
     }
 
-    this.activeCooldown.timeline.events.push(event);
+    this.activeWindow.timeline.events.push(event);
   }
 
   onSKFalloff(event: RemoveBuffEvent) {
-    if (!this.activeCooldown) {
+    if (!this.activeWindow) {
       return;
     }
 
-    this.activeCooldown.timeline.end = event.timestamp;
+    this.activeWindow.timeline.end = event.timestamp;
 
-    this.recordCooldown(this.activeCooldown);
-    this.activeCooldown = null;
-  }
-
-  getActiveFlSDuration(cast: CastEvent) {
-    const enemies = this.enemies.getEntities();
-    let maxFlSDuration = 0;
-    Object.values(enemies).forEach((enemy) => {
-      maxFlSDuration = Math.max(
-        maxFlSDuration,
-        enemy.getRemainingBuffTimeAtTimestamp(SPELLS.FLAME_SHOCK.id, 18000, 24000, cast.timestamp),
-      );
-    });
-
-    return maxFlSDuration;
-  }
-
-  getActiveElShocksDuration(cast: CastEvent) {
-    const enemies = this.enemies.getEntities();
-    let maxElShocksDuration = 0;
-    Object.values(enemies).forEach((enemy) => {
-      maxElShocksDuration = Math.max(
-        maxElShocksDuration,
-        enemy.getRemainingBuffTimeAtTimestamp(
-          TALENTS.ELECTRIFIED_SHOCKS_TALENT.id,
-          9000,
-          9000,
-          cast.timestamp,
-        ),
-      );
-    });
-
-    return maxElShocksDuration;
+    this.recordCooldown(this.activeWindow);
+    this.activeWindow = null;
   }
 
   description() {
@@ -183,13 +171,24 @@ class Stormkeeper extends MajorCooldown<SKCast> {
   }
 
   _explainMaelstromPerformance(cast: SKCast) {
-    let base_maelstrom_requirement = 90;
+    /* How much maelstrom the first builder of the window generates */
+    const firstCastMaelstrnGen = 14;
+
+    let spenderCost;
+    if (this.selectedCombatant.hasTalent(TALENTS.ELEMENTAL_BLAST_TALENT)) {
+      spenderCost = 75;
+    } else {
+      spenderCost = 50;
+    }
+
+    let base_maelstrom_requirement = GUIDE_BASE_MAELSTROM_REQUIREMENT;
+    /* The user has already cast one spender, so they don't need the maelstrom for two. */
     if (cast.sopOnCast) {
-      base_maelstrom_requirement -= 75;
+      base_maelstrom_requirement -= spenderCost;
     }
 
     let maelstromOnCastPerformance = QualitativePerformance.Fail;
-    if (cast.maelstromOnCast > 138) {
+    if (cast.maelstromOnCast > this.maelstromTracker.maxResource - firstCastMaelstrnGen) {
       maelstromOnCastPerformance = QualitativePerformance.Good;
     } else if (cast.maelstromOnCast >= base_maelstrom_requirement) {
       maelstromOnCastPerformance = QualitativePerformance.Perfect;
@@ -207,22 +206,22 @@ class Stormkeeper extends MajorCooldown<SKCast> {
           {cast.maelstromOnCast} <ResourceLink id={RESOURCE_TYPES.MAELSTROM.id} /> on window start
         </span>
       ),
-      check: 'stormkeeper',
+      check: 'stormkeeper-maelstrom',
       timestamp: cast.event.timestamp,
     };
 
     return checklistItem;
   }
 
-  _explainFlsPerformance(cast: SKCast) {
-    let FlSPerformance = QualitativePerformance.Ok;
+  _explainFSPerformance(cast: SKCast) {
+    let FSPerformance = QualitativePerformance.Ok;
 
-    if (cast.flameshockDurationOnCast > 10000) {
-      FlSPerformance = QualitativePerformance.Perfect;
+    if (cast.flameshockDurationOnCast > GUIDE_FLAMESHOCK_DURATION_PERFECT) {
+      FSPerformance = QualitativePerformance.Perfect;
     }
 
     const checklistItem = {
-      performance: FlSPerformance,
+      performance: FSPerformance,
       summary: (
         <span>
           <SpellLink id={SPELLS.FLAME_SHOCK} />: {cast.flameshockDurationOnCast / 1000}s{' '}
@@ -235,7 +234,7 @@ class Stormkeeper extends MajorCooldown<SKCast> {
           on window start
         </span>
       ),
-      check: 'stormkeeper',
+      check: 'stormkeeper-flameshock',
       timestamp: cast.event.timestamp,
     };
 
@@ -245,7 +244,7 @@ class Stormkeeper extends MajorCooldown<SKCast> {
   _explainElShocksPerformance(cast: SKCast) {
     let ElShocksPerformance = QualitativePerformance.Ok;
 
-    if (cast.electrifiedShocksDurationOnCast > 6000) {
+    if (cast.electrifiedShocksDurationOnCast > GUIDE_ELSHOCKS_DURATION_PERFECT) {
       ElShocksPerformance = QualitativePerformance.Perfect;
     }
 
@@ -264,7 +263,7 @@ class Stormkeeper extends MajorCooldown<SKCast> {
           {cast.electrifiedShocksDurationOnCast / 1000}s remaining on window start
         </span>
       ),
-      check: 'stormkeeper',
+      check: 'stormkeeper-elshocks',
       timestamp: cast.event.timestamp,
     };
 
@@ -293,7 +292,7 @@ class Stormkeeper extends MajorCooldown<SKCast> {
       if (event.ability.guid === TALENTS.ELEMENTAL_BLAST_TALENT.id) {
         sopActive = true;
 
-        if (!moteActive && !this.spellUsable.isAvailable(TALENTS.LAVA_BURST_TALENT.id)) {
+        if (!moteActive) {
           isCorrect = false;
           isInefficientReason =
             'Elemental blast should be empowered by Master of the Elements (Lava Burst cast directly before it)';
@@ -323,8 +322,6 @@ class Stormkeeper extends MajorCooldown<SKCast> {
         event.meta = { isInefficientCast: true, inefficientCastReason: isInefficientReason };
       }
     });
-
-    console.log('skcat', cast);
   }
 
   _explainAPLWithDetails(cast: SKCast) {
@@ -334,7 +331,7 @@ class Stormkeeper extends MajorCooldown<SKCast> {
       performance: cast.timeline.performance,
       summary: <span>Spell order</span>,
       details: <span>Spell order: See below</span>,
-      check: 'stormkeeper',
+      check: 'stormkeeper-timeline',
       timestamp: cast.event.timestamp,
     };
 
@@ -360,15 +357,17 @@ class Stormkeeper extends MajorCooldown<SKCast> {
   explainPerformance(cast: SKCast): SpellUse {
     const APL = this._explainAPLWithDetails(cast);
     const maelstromOnCast = this._explainMaelstromPerformance(cast);
-    const FlSDuration = this._explainFlsPerformance(cast);
+    const FlSDuration = this._explainFSPerformance(cast);
     const ELShocksperf = this._explainElShocksPerformance(cast);
 
     const totalPerformance = getLowestPerf([
       APL.checklistItem.performance,
       maelstromOnCast.performance,
+      /* Failing this should not nuke the entire performance, so make the lower limit Good */
       FlSDuration.performance === QualitativePerformance.Perfect
         ? QualitativePerformance.Perfect
         : QualitativePerformance.Good,
+      /* Failing this should not nuke the entire performance, so make the lower limit Good */
       ELShocksperf.performance === QualitativePerformance.Perfect
         ? QualitativePerformance.Perfect
         : QualitativePerformance.Good,

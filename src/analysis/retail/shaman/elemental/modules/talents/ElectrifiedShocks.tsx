@@ -19,6 +19,11 @@ const NATURE_DAMAGE_OVERLOADS = [
   SPELLS.ELEMENTAL_BLAST_OVERLOAD,
 ];
 
+interface FSCast {
+  empowered: number;
+  nonEmpowered: number;
+}
+
 class ElectrifiedShocks extends Analyzer {
   static dependencies = {
     enemies: Enemies,
@@ -26,27 +31,24 @@ class ElectrifiedShocks extends Analyzer {
 
   protected enemies!: Enemies;
 
-  ESEmpoweredSpells: { [key: number]: number };
-  nonEmpoweredSpells: { [key: number]: number };
+  frsNatureDamage: { [key: number]: FSCast };
   activeCL: { [key: number]: boolean[] };
 
   constructor(options: Options) {
     super(options);
 
-    this.ESEmpoweredSpells = {};
-    this.nonEmpoweredSpells = {};
-
-    const combined_spells = [...NATURE_DAMAGE_SPELLS, ...NATURE_DAMAGE_OVERLOADS];
+    this.frsNatureDamage = {};
     this.activeCL = {};
-
-    combined_spells.forEach((s) => {
-      this.ESEmpoweredSpells[s.id] = 0;
-      this.nonEmpoweredSpells[s.id] = 0;
-    });
 
     if (!this.selectedCombatant.hasTalent(TALENTS.ELECTRIFIED_SHOCKS_TALENT)) {
       return;
     }
+
+    const combined_spells = [...NATURE_DAMAGE_SPELLS, ...NATURE_DAMAGE_OVERLOADS];
+
+    combined_spells.forEach((s) => {
+      this.frsNatureDamage[s.id] = { empowered: 0, nonEmpowered: 0 };
+    });
 
     this.addEventListener(
       Events.damage.by(SELECTED_PLAYER).spell(combined_spells),
@@ -61,7 +63,14 @@ class ElectrifiedShocks extends Analyzer {
   }
 
   onCL(event: CastEvent) {
-    console.log('activeCL', this.activeCL);
+    /* I could not find a way to determine which CL overloads belong to
+    which casts of CL, so this is some bodged logic to replace that.
+    
+    Every time CL or it's overload deals damage, it's registered in the 'onNatureDamage'
+    function below. When CL is cast next time, this function (onCL) registers
+    the these previous DamageEvent's as fsCasts.
+    
+    */
     if (Object.keys(this.activeCL).length === 0) {
       return;
     }
@@ -70,9 +79,9 @@ class ElectrifiedShocks extends Analyzer {
       Object.entries(this.activeCL).forEach(([spell, casts]) => {
         casts.forEach((empowered) => {
           if (empowered) {
-            this.ESEmpoweredSpells[Number(spell)] += 1;
+            this.frsNatureDamage[Number(spell)].empowered += 1;
           } else {
-            this.nonEmpoweredSpells[Number(spell)] += 1;
+            this.frsNatureDamage[Number(spell)].nonEmpowered += 1;
           }
         });
       });
@@ -95,18 +104,16 @@ class ElectrifiedShocks extends Analyzer {
       }
       this.activeCL[event.ability.guid].push(targetHasElshocks);
       return;
-    }
-
-    if (targetHasElshocks) {
-      this.ESEmpoweredSpells[event.ability.guid] += 1;
     } else {
-      this.nonEmpoweredSpells[event.ability.guid] += 1;
+      if (targetHasElshocks) {
+        this.frsNatureDamage[event.ability.guid].empowered += 1;
+      } else {
+        this.frsNatureDamage[event.ability.guid].nonEmpowered += 1;
+      }
     }
   }
 
   get guideSubsection() {
-    console.log(this.ESEmpoweredSpells, this.nonEmpoweredSpells);
-
     const description = (
       <>
         <SpellLink id={TALENTS.ELECTRIFIED_SHOCKS_TALENT} /> increases all{' '}
@@ -121,6 +128,7 @@ class ElectrifiedShocks extends Analyzer {
         should aim to have this debuff present on every instance of nature damage.
       </>
     );
+    /* There is probably a better way to build this table */
     const data = (
       <div>
         <small>Instances of nature damage empowered by Electrified Shocks</small>
@@ -136,13 +144,14 @@ class ElectrifiedShocks extends Analyzer {
           </thead>
           <tbody>
             {NATURE_DAMAGE_SPELLS.map((v, i) => {
-              const pass = this.ESEmpoweredSpells[v.id];
-              const fail = this.nonEmpoweredSpells[v.id];
+              const pass = this.frsNatureDamage[v.id].empowered;
+              const fail = this.frsNatureDamage[v.id].nonEmpowered;
+              /* Don't show the row if there were no casts */
               if (pass + fail === 0) {
                 return <></>;
               }
-              const overloadPass = this.ESEmpoweredSpells[NATURE_DAMAGE_OVERLOADS[i].id];
-              const overloadFail = this.nonEmpoweredSpells[NATURE_DAMAGE_OVERLOADS[i].id];
+              const overloadPass = this.frsNatureDamage[NATURE_DAMAGE_OVERLOADS[i].id].empowered;
+              const overloadFail = this.frsNatureDamage[NATURE_DAMAGE_OVERLOADS[i].id].nonEmpowered;
 
               const isCL = v.id === TALENTS.CHAIN_LIGHTNING_TALENT.id;
 

@@ -47,11 +47,6 @@ class Icefury extends Analyzer {
     );
 
     this.addEventListener(
-      Events.applybuff.by(SELECTED_PLAYER).spell(TALENTS.ICEFURY_TALENT),
-      this.onIcefuryBuff,
-    );
-
-    this.addEventListener(
       Events.removebuff.by(SELECTED_PLAYER).spell(TALENTS.ICEFURY_TALENT),
       this.onIcefuryBuffDropoff,
     );
@@ -116,8 +111,6 @@ class Icefury extends Analyzer {
       </>
     );
 
-    console.log(this.icefuryWindows);
-
     const icefuryWindowPerformances = {
       perfect: { count: 0, label: 'Used all 4 stacks @ ' },
       ok: { count: 0, label: 'Used 3 of 4 available stacks @ ' },
@@ -125,6 +118,7 @@ class Icefury extends Analyzer {
     };
     this.icefuryWindows.forEach((w) => {
       let perf;
+      /* Find out which icefuryWindowPerformance this window belongs to */
       if (w.empoweredCasts < 3) {
         perf = icefuryWindowPerformances.bad;
       } else if (w.empoweredCasts === 3) {
