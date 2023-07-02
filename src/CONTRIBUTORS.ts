@@ -511,6 +511,10 @@ export const HawkCorrigan: Contributor = {
   nickname: 'HawkCorrigan',
   github: 'HawkCorrigan',
 };
+export const Awildfivreld: Contributor = {
+  nickname: 'Awildfivreld',
+  github: 'awildfivreld',
+};
 export const Vetyst: Contributor = {
   nickname: 'Vetyst',
   github: 'djanse',
