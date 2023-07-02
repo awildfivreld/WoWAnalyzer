@@ -38,13 +38,6 @@ class Buffs extends CoreAuras {
         timelineHighlight: true,
       },
       {
-        spellId: TALENTS.EARTH_ELEMENTAL_TALENT.id,
-        triggeredBySpellId: TALENTS.EARTH_ELEMENTAL_TALENT.id,
-        // It does not seem like there is any event that signals that the elemental has despawned,
-        // so if timelineHighlight is set to true, the highlight will never end.
-        timelineHighlight: false,
-      },
-      {
         spellId: TALENTS.STORM_ELEMENTAL_TALENT.id,
         triggeredBySpellId: TALENTS.STORM_ELEMENTAL_TALENT.id,
         // It does not seem like there is any event that signals that the elemental has despawned,
