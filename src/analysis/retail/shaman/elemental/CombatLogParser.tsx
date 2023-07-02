@@ -36,9 +36,12 @@ import CallToDominance from 'parser/retail/modules/items/dragonflight/CallToDomi
 import Guide from './Guide';
 import ElectrifiedShocks from './modules/talents/ElectrifiedShocks';
 import SpenderWindow from './modules/features/SpenderWindow';
+import EleGlobalCooldown from './modules/core/EleGlobalCooldown';
 
 class CombatLogParser extends CoreCombatLogParser {
   static specModules = {
+    // Core
+    globalCooldown: EleGlobalCooldown,
     // Features
     abilities: Abilities,
     flameShock: FlameShock,

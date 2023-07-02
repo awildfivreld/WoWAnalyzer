@@ -260,7 +260,6 @@ class Entity {
       maxBuffLength,
       sourceId,
     );
-    console.log('buffapptimes', buffApplicationTimes);
     const keys: number[] = Array.from(buffApplicationTimes.keys()).sort((a, b) => a - b);
     if (keys.length === 0) {
       return 0;

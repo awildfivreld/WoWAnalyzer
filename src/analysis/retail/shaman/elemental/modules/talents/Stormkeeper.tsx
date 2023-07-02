@@ -43,7 +43,6 @@ interface SKCast extends SpellCast {
   moteOnCast: boolean;
   /** What the user cast between casting SK and consuming the second buff. */
   timeline: SKTimeline;
-  _hasStartedRotation: boolean;
 }
 
 const GUIDE_BASE_MAELSTROM_REQUIREMENT = 90;
@@ -62,11 +61,18 @@ class Stormkeeper extends MajorCooldown<SKCast> {
   protected spellUsable!: SpellUsable;
 
   activeWindow: SKCast | null;
+  lastSKHardcast: CastEvent | null;
+  lastGeneratedByOverload: number;
 
   damageDoneByBuffedCasts = 0;
 
   constructor(options: Options) {
     super({ spell: TALENTS.STORMKEEPER_1_ELEMENTAL_TALENT }, options);
+
+    this.activeWindow = null;
+    this.lastSKHardcast = null;
+    this.lastGeneratedByOverload = 0;
+
     this.addEventListener(Events.cast.by(SELECTED_PLAYER), this.onEvent);
     this.addEventListener(
       Events.cast.by(SELECTED_PLAYER).spell(TALENTS.STORMKEEPER_1_ELEMENTAL_TALENT),
@@ -76,46 +82,22 @@ class Stormkeeper extends MajorCooldown<SKCast> {
       Events.removebuff.by(SELECTED_PLAYER).spell(TALENTS.STORMKEEPER_1_ELEMENTAL_TALENT),
       this.onSKFalloff,
     );
-    this.activeWindow = null;
   }
 
   onCast(cast: CastEvent) {
-    this.activeWindow = {
-      event: cast,
-      maelstromOnCast: this.maelstromTracker.current,
-      /* Snapshot FS and elshocks here, but these might be overriden later,
-      if the user cast these spells before starting the actual rotation. */
-      flameshockDurationOnCast: this.enemies.getLongestDurationRemaining(
-        SPELLS.FLAME_SHOCK.id,
-        18000,
-        24000,
-        cast.timestamp,
-      ),
-      electrifiedShocksDurationOnCast: this.enemies.getLongestDurationRemaining(
-        TALENTS.ELECTRIFIED_SHOCKS_TALENT.id,
-        9000,
-        9000,
-        cast.timestamp,
-      ),
-      sopOnCast: this.selectedCombatant.hasBuff(SPELLS.SURGE_OF_POWER_BUFF.id),
-      moteOnCast: this.selectedCombatant.hasBuff(SPELLS.MASTER_OF_THE_ELEMENTS_BUFF.id),
-      timeline: {
-        start: cast.timestamp,
-        end: -1,
-        events: [cast],
-        performance: QualitativePerformance.Perfect,
-      },
-      _hasStartedRotation: false,
-    };
+    this.lastSKHardcast = cast;
+    this.lastGeneratedByOverload = this.maelstromTracker.generatedByOverload();
   }
 
   onEvent(event: CastEvent) {
-    if (!this.activeWindow) {
+    /* Don't include events that did not happen between hardcasts and the
+    SK buff falling off. */
+    if (!this.lastSKHardcast) {
       return;
     }
 
     if (
-      !this.activeWindow._hasStartedRotation &&
+      !this.activeWindow &&
       [
         SPELLS.LIGHTNING_BOLT.id,
         TALENTS.CHAIN_LIGHTNING_TALENT.id,
@@ -124,25 +106,72 @@ class Stormkeeper extends MajorCooldown<SKCast> {
         TALENTS.ELEMENTAL_BLAST_TALENT.id,
       ].includes(event.ability.guid)
     ) {
-      this.activeWindow._hasStartedRotation = true;
+      this.activeWindow = {
+        event: this.lastSKHardcast,
+        maelstromOnCast: this.maelstromTracker.current,
+        /* Snapshot FS and elshocks here, but these might be overriden later,
+        if the user cast these spells before starting the actual rotation. */
+        flameshockDurationOnCast: this.enemies.getLongestDurationRemaining(
+          SPELLS.FLAME_SHOCK.id,
+          18000,
+          24000,
+          event.timestamp,
+        ),
+        electrifiedShocksDurationOnCast: this.enemies.getLongestDurationRemaining(
+          TALENTS.ELECTRIFIED_SHOCKS_TALENT.id,
+          9000,
+          9000,
+          event.timestamp,
+        ),
+        sopOnCast: this.selectedCombatant.hasBuff(SPELLS.SURGE_OF_POWER_BUFF.id),
+        moteOnCast: this.selectedCombatant.hasBuff(SPELLS.MASTER_OF_THE_ELEMENTS_BUFF.id),
+        timeline: {
+          start: this.lastSKHardcast.timestamp,
+          end: -1,
+          events: [this.lastSKHardcast],
+          performance: QualitativePerformance.Perfect,
+        },
+      };
+
+      /* If the user started the window with a spender, then the maelstrom
+      has already been consumed */
+      if (event.ability.guid === TALENTS.ELEMENTAL_BLAST_TALENT.id) {
+        this.activeWindow.maelstromOnCast += 75;
+      }
     }
 
-    if (event.ability.guid === SPELLS.FLAME_SHOCK.id && !this.activeWindow._hasStartedRotation) {
-      /* This might be slightly simplified, but if the user cast FS after SK,
-      it won't expire in the window anyway. */
-      this.activeWindow.flameshockDurationOnCast = 18000;
-    }
+    if (this.activeWindow) {
+      if (
+        event.ability.guid === TALENTS.ELEMENTAL_BLAST_TALENT.id &&
+        !this.selectedCombatant.hasBuff(SPELLS.MASTER_OF_THE_ELEMENTS_BUFF.id, event.timestamp, 100)
+      ) {
+        event.meta = {
+          isInefficientCast: true,
+          inefficientCastReason: <>Elemental Blast cast without Master of the Elements</>,
+        };
+        this.activeWindow.timeline.performance = getLowestPerf([
+          QualitativePerformance.Ok,
+          this.activeWindow.timeline.performance,
+        ]);
+      }
 
-    if (
-      event.ability.guid === TALENTS.FROST_SHOCK_TALENT.id &&
-      !this.activeWindow._hasStartedRotation
-    ) {
-      /* This might be slightly simplified, but if the user cast FS after SK,
-      it won't expire in the window anyway. */
-      this.activeWindow.electrifiedShocksDurationOnCast = 9000;
-    }
+      if (
+        (event.ability.guid === SPELLS.LIGHTNING_BOLT.id ||
+          event.ability.guid === TALENTS.CHAIN_LIGHTNING_TALENT.id) &&
+        !this.selectedCombatant.hasBuff(SPELLS.SURGE_OF_POWER_BUFF.id, event.timestamp, 100)
+      ) {
+        event.meta = {
+          isInefficientCast: true,
+          inefficientCastReason: <>{event.ability.name} cast without Surge of Power</>,
+        };
+        this.activeWindow.timeline.performance = getLowestPerf([
+          QualitativePerformance.Fail,
+          this.activeWindow.timeline.performance,
+        ]);
+      }
 
-    this.activeWindow.timeline.events.push(event);
+      this.activeWindow.timeline.events.push(event);
+    }
   }
 
   onSKFalloff(event: RemoveBuffEvent) {
@@ -153,6 +182,7 @@ class Stormkeeper extends MajorCooldown<SKCast> {
     this.activeWindow.timeline.end = event.timestamp;
 
     this.recordCooldown(this.activeWindow);
+    this.lastSKHardcast = null;
     this.activeWindow = null;
   }
 
@@ -171,8 +201,12 @@ class Stormkeeper extends MajorCooldown<SKCast> {
   }
 
   _explainMaelstromPerformance(cast: SKCast) {
-    /* How much maelstrom the first builder of the window generates */
-    const firstCastMaelstrnGen = 14;
+    /* How much maelstrom the first builder of the window generates.
+    
+    Nowadays that should be 12 (LvB)
+    
+    */
+    const firstCastMaelstrnGen = 12;
 
     let spenderCost;
     if (this.selectedCombatant.hasTalent(TALENTS.ELEMENTAL_BLAST_TALENT)) {
@@ -187,12 +221,19 @@ class Stormkeeper extends MajorCooldown<SKCast> {
       base_maelstrom_requirement -= spenderCost;
     }
 
-    let maelstromOnCastPerformance = QualitativePerformance.Fail;
+    let maelstromOnCastPerformance = QualitativePerformance.Ok;
     if (cast.maelstromOnCast > this.maelstromTracker.maxResource - firstCastMaelstrnGen) {
       maelstromOnCastPerformance = QualitativePerformance.Good;
     } else if (cast.maelstromOnCast >= base_maelstrom_requirement) {
       maelstromOnCastPerformance = QualitativePerformance.Perfect;
     }
+
+    const imperfectDetails = (
+      <>
+        (Should have been {base_maelstrom_requirement}-
+        {this.maelstromTracker.maxResource - firstCastMaelstrnGen})
+      </>
+    );
 
     const checklistItem = {
       performance: maelstromOnCastPerformance,
@@ -203,7 +244,8 @@ class Stormkeeper extends MajorCooldown<SKCast> {
       ),
       details: (
         <span>
-          {cast.maelstromOnCast} <ResourceLink id={RESOURCE_TYPES.MAELSTROM.id} /> on window start
+          {cast.maelstromOnCast} <ResourceLink id={RESOURCE_TYPES.MAELSTROM.id} /> on window start{' '}
+          {maelstromOnCastPerformance !== QualitativePerformance.Perfect && imperfectDetails}
         </span>
       ),
       check: 'stormkeeper-maelstrom',
@@ -270,63 +312,7 @@ class Stormkeeper extends MajorCooldown<SKCast> {
     return checklistItem;
   }
 
-  _processTimelineEvents(cast: SKCast) {
-    // This APL analysis is extremely rudementary, but I haven't gotten to look at the actual
-    // APL stuff yet.
-    const timeline = cast.timeline;
-    let sopActive = cast.sopOnCast;
-    let moteActive = cast.moteOnCast;
-
-    timeline.events.forEach((event, i) => {
-      let isCorrect = true;
-      let isInefficientReason = '';
-
-      if (event.ability.guid === TALENTS.LAVA_BURST_TALENT.id) {
-        moteActive = true;
-      }
-
-      if (event.ability.guid === TALENTS.EARTHQUAKE_TALENT.id) {
-        sopActive = true;
-      }
-
-      if (event.ability.guid === TALENTS.ELEMENTAL_BLAST_TALENT.id) {
-        sopActive = true;
-
-        if (!moteActive) {
-          isCorrect = false;
-          isInefficientReason =
-            'Elemental blast should be empowered by Master of the Elements (Lava Burst cast directly before it)';
-          timeline.performance = getLowestPerf([QualitativePerformance.Ok, timeline.performance]);
-        }
-
-        moteActive = false;
-      }
-
-      if (
-        event.ability.guid === SPELLS.LIGHTNING_BOLT.id ||
-        event.ability.guid === TALENTS.CHAIN_LIGHTNING_TALENT.id
-      ) {
-        if (!sopActive) {
-          isCorrect = false;
-          isInefficientReason =
-            'This ' +
-            event.ability.name +
-            ' should have been empowered by a Surge of Power (cast a spender directly before it). You probably cast something else between your spender and this spell, or did not cast a spender in between.';
-          timeline.performance = getLowestPerf([QualitativePerformance.Fail, timeline.performance]);
-        }
-
-        sopActive = false;
-      }
-
-      if (!isCorrect) {
-        event.meta = { isInefficientCast: true, inefficientCastReason: isInefficientReason };
-      }
-    });
-  }
-
   _explainAPLWithDetails(cast: SKCast) {
-    this._processTimelineEvents(cast);
-
     const checklistItem = {
       performance: cast.timeline.performance,
       summary: <span>Spell order</span>,
@@ -336,19 +322,25 @@ class Stormkeeper extends MajorCooldown<SKCast> {
     };
 
     const extraDetails = (
-      <EmbeddedTimelineContainer
-        secondWidth={100}
-        secondsShown={(cast.timeline.end - cast.timeline.start) / 1000}
+      <div
+        style={{
+          overflowX: 'scroll',
+        }}
       >
-        <SpellTimeline>
-          <Casts
-            start={cast.event.timestamp}
-            movement={undefined}
-            secondWidth={100}
-            events={cast.timeline.events}
-          />
-        </SpellTimeline>
-      </EmbeddedTimelineContainer>
+        <EmbeddedTimelineContainer
+          secondWidth={60}
+          secondsShown={(cast.timeline.end - cast.timeline.start) / 1000}
+        >
+          <SpellTimeline>
+            <Casts
+              start={cast.event.timestamp}
+              movement={undefined}
+              secondWidth={60}
+              events={cast.timeline.events}
+            />
+          </SpellTimeline>
+        </EmbeddedTimelineContainer>
+      </div>
     );
 
     return { extraDetails, checklistItem };

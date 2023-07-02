@@ -382,6 +382,7 @@ export interface BeginChannelEvent extends Event<EventType.BeginChannel> {
   targetInstance?: number;
   sourceIsFriendly: boolean;
   targetIsFriendly: boolean;
+  globalCooldown?: GlobalCooldownEvent;
   classResources?: Array<ClassResources & { cost: number }>;
   // Added by any module, used in the timeline
   meta?: {

@@ -1,8 +1,9 @@
+import TALENTS from 'common/TALENTS/shaman';
 import { GuideProps, Section } from 'interface/guide';
 import CombatLogParser from '../../CombatLogParser';
-import TALENTS from 'common/TALENTS/shaman';
 import GenericCooldownGraphSubsection from './GenericCooldownGraphSubsection';
 import CooldownUsage from 'parser/core/MajorCooldowns/CooldownUsage';
+import FlameshockSubSection from './FlameshockSubSection';
 
 export default function CoreRotationSection({
   modules,
@@ -23,10 +24,10 @@ export default function CoreRotationSection({
         ]}
       />
       <CooldownUsage analyzer={modules.stormkeeper} />
+      {modules.spenderWindow.guideSubsection}
       {modules.icefury.guideSubsection}
       {modules.electrifiedShocks.guideSubsection}
-      {modules.spenderWindow.guideSubsection}
-      {modules.flameShock.guideSubsection}
+      <FlameshockSubSection modules={modules} events={events} info={info} />
     </Section>
   );
 }

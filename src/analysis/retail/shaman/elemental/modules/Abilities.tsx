@@ -216,6 +216,30 @@ class Abilities extends CoreAbilities {
         spell: SPELLS.REINCARNATION.id,
         category: SPELL_CATEGORY.OTHERS,
       },
+      {
+        spell: TALENTS.EARTH_ELEMENTAL_TALENT.id,
+        category: SPELL_CATEGORY.DEFENSIVE,
+        enabled: combatant.hasTalent(TALENTS.EARTH_ELEMENTAL_TALENT),
+        cooldown: 300,
+      },
+      {
+        spell: TALENTS.NATURES_SWIFTNESS_TALENT.id,
+        category: SPELL_CATEGORY.OTHERS,
+        enabled: combatant.hasTalent(TALENTS.NATURES_SWIFTNESS_TALENT),
+        cooldown: 60,
+      },
+      {
+        spell: TALENTS.ANCESTRAL_GUIDANCE_TALENT.id,
+        category: SPELL_CATEGORY.DEFENSIVE,
+        enabled: combatant.hasTalent(TALENTS.ANCESTRAL_GUIDANCE_TALENT),
+        cooldown: 120,
+      },
+      {
+        spell: TALENTS.SPIRITWALKERS_GRACE_TALENT.id,
+        category: SPELL_CATEGORY.UTILITY,
+        enabled: combatant.hasTalent(TALENTS.SPIRITWALKERS_GRACE_TALENT),
+        cooldown: 90,
+      },
     ];
   }
 }

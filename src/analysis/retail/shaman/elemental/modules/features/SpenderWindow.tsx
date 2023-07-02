@@ -1,3 +1,4 @@
+import PerformancePercentage from 'analysis/retail/demonhunter/shared/guide/PerformancePercentage';
 import SPELLS from 'common/SPELLS';
 import TALENTS from 'common/TALENTS/shaman';
 import { Talent } from 'common/TALENTS/types';
@@ -7,6 +8,7 @@ import { explanationAndDataSubsection } from 'interface/guide/components/Explana
 import Analyzer, { Options, SELECTED_PLAYER } from 'parser/core/Analyzer';
 import Events, { CastEvent } from 'parser/core/Events';
 import Enemies from 'parser/shared/modules/Enemies';
+import { QualitativePerformance } from 'parser/ui/QualitativePerformance';
 
 interface ActiveSpenderWindow {
   timestamp: number;
@@ -16,6 +18,12 @@ interface ActiveSpenderWindow {
 interface FinishedSpenderWindow extends ActiveSpenderWindow {
   elshocksPresent: boolean;
   sopUse: CastEvent;
+}
+
+interface PerformanceData {
+  perfectPct: number;
+  goodPct: number;
+  okPct: number;
 }
 
 const SOP_SPENDERS = [
@@ -31,6 +39,60 @@ const GOOD_SOP_SPENDERS = [
   TALENTS.CHAIN_LIGHTNING_TALENT.id,
   SPELLS.FLAME_SHOCK.id,
 ];
+
+const PERFECT_WINDOWS_THRESHOLDS: PerformanceData = {
+  perfectPct: 0.9,
+  goodPct: 0.6,
+  okPct: 0.5,
+};
+
+const MISSING_ELSHOCKS_THRESHOLDS: PerformanceData = {
+  perfectPct: 0,
+  goodPct: 0.2,
+  okPct: 0.3,
+};
+
+const MISSING_MOTE_THRESHOLDS: PerformanceData = {
+  perfectPct: 0,
+  goodPct: 0.4,
+  okPct: 0.5,
+};
+
+const WRONG_SOP_THRESHOLDS: PerformanceData = {
+  perfectPct: 0.0,
+  goodPct: 0.05,
+  okPct: 0.1,
+};
+
+// Probably a better way to do this. Good here might either be 100% or 0%.
+function determinePerformance(
+  performancePct: number,
+  data: PerformanceData,
+): QualitativePerformance {
+  if (data.perfectPct > data.okPct) {
+    if (performancePct >= data.perfectPct) {
+      return QualitativePerformance.Perfect;
+    }
+    if (performancePct >= data.goodPct) {
+      return QualitativePerformance.Good;
+    }
+    if (performancePct >= data.okPct) {
+      return QualitativePerformance.Ok;
+    }
+    return QualitativePerformance.Fail;
+  } else {
+    if (performancePct <= data.perfectPct) {
+      return QualitativePerformance.Perfect;
+    }
+    if (performancePct <= data.goodPct) {
+      return QualitativePerformance.Good;
+    }
+    if (performancePct <= data.okPct) {
+      return QualitativePerformance.Ok;
+    }
+    return QualitativePerformance.Fail;
+  }
+}
 
 class SpenderWindow extends Analyzer {
   static dependencies = {
@@ -101,6 +163,7 @@ class SpenderWindow extends Analyzer {
         ?.hasBuff(TALENTS.ELECTRIFIED_SHOCKS_TALENT.id, event.timestamp) || false;
 
     this.spenderWindows.push({ ...this.activeSpenderWindow, elshocksPresent, sopUse: event });
+    this.activeSpenderWindow = null;
   }
 
   get guideSubsection() {
@@ -137,33 +200,53 @@ class SpenderWindow extends Analyzer {
         .join(', ');
     };
 
-    const renderRow = (label: JSX.Element, subWindows: FinishedSpenderWindow[]) => {
+    const renderRow = (
+      label: JSX.Element,
+      subWindows: FinishedSpenderWindow[],
+      performanceData: PerformanceData,
+    ) => {
       const windowsPct = subWindows.length / this.spenderWindows.length;
+
       return (
         <>
           {label}:{' '}
-          <TooltipElement content={'@ ' + windowTimestamps(subWindows)}>
-            <strong>
-              {subWindows.length} ({(windowsPct * 100).toFixed(0)}%)
-            </strong>
-          </TooltipElement>
+          <PerformancePercentage
+            performance={determinePerformance(windowsPct, performanceData)}
+            percentage={windowsPct}
+            flatAmount={subWindows.length}
+            perfectPercentage={performanceData.perfectPct}
+            goodPercentage={performanceData.goodPct}
+            okPercentage={performanceData.okPct}
+          />{' '}
+          <TooltipElement content={'@ ' + windowTimestamps(subWindows)}>@</TooltipElement>
         </>
       );
     };
 
     const data = (
       <div>
-        {renderRow(<>Perfect spender windows</>, perfectSpenderWindows)}
+        {renderRow(<>Perfect spender windows</>, perfectSpenderWindows, PERFECT_WINDOWS_THRESHOLDS)}
         <br />
         <br />
         <strong> Imperfect window breakdown</strong> -{' '}
         <small>Note one window might be included multiple times below.</small>
         <br />
         Wrong <SpellLink spell={TALENTS.SURGE_OF_POWER_TALENT} /> usage:{' '}
+        <PerformancePercentage
+          performance={determinePerformance(
+            spenderWindowsWrongSop.length / this.spenderWindows.length,
+            WRONG_SOP_THRESHOLDS,
+          )}
+          percentage={spenderWindowsWrongSop.length / this.spenderWindows.length}
+          flatAmount={spenderWindowsWrongSop.length}
+          perfectPercentage={WRONG_SOP_THRESHOLDS.perfectPct}
+          goodPercentage={WRONG_SOP_THRESHOLDS.goodPct}
+          okPercentage={WRONG_SOP_THRESHOLDS.okPct}
+        />{' '}
         <TooltipElement
           content={
             <>
-              @{' '}
+              @
               {spenderWindowsWrongSop.map((w) => (
                 <>
                   {formatDuration(w.timestamp - this.owner.fight.start_time)}
@@ -173,19 +256,8 @@ class SpenderWindow extends Analyzer {
             </>
           }
         >
-          <strong>
-            {spenderWindowsWrongSop.length} (
-            {((spenderWindowsWrongSop.length / this.spenderWindows.length) * 100).toFixed(0)}%)
-          </strong>
+          @
         </TooltipElement>
-        <br />
-        {this.selectedCombatant.hasTalent(TALENTS.MASTER_OF_THE_ELEMENTS_TALENT) &&
-          renderRow(
-            <>
-              Elemental Blast missing <SpellLink spell={TALENTS.MASTER_OF_THE_ELEMENTS_TALENT} />
-            </>,
-            spenderWindowsMissingMote,
-          )}
         <br />
         {this.selectedCombatant.hasTalent(TALENTS.ELECTRIFIED_SHOCKS_TALENT) &&
           renderRow(
@@ -194,6 +266,16 @@ class SpenderWindow extends Analyzer {
               <SpellLink spell={TALENTS.ELECTRIFIED_SHOCKS_TALENT} />
             </>,
             spenderWindowsMissingElshocks,
+            MISSING_ELSHOCKS_THRESHOLDS,
+          )}
+        <br />
+        {this.selectedCombatant.hasTalent(TALENTS.MASTER_OF_THE_ELEMENTS_TALENT) &&
+          renderRow(
+            <>
+              Elemental Blast missing <SpellLink spell={TALENTS.MASTER_OF_THE_ELEMENTS_TALENT} />
+            </>,
+            spenderWindowsMissingMote,
+            MISSING_MOTE_THRESHOLDS,
           )}
         <br />
       </div>
