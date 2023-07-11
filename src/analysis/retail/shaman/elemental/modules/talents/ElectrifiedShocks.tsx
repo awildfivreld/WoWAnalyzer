@@ -75,7 +75,7 @@ class ElectrifiedShocks extends Analyzer {
       return;
     }
 
-    if (this.activeCL[TALENTS.CHAIN_LIGHTNING_TALENT.id].length <= 3) {
+    if ((this.activeCL[TALENTS.CHAIN_LIGHTNING_TALENT.id] || []).length <= 3) {
       Object.entries(this.activeCL).forEach(([spell, casts]) => {
         casts.forEach((empowered) => {
           if (empowered) {

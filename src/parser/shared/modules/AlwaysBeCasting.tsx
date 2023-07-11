@@ -2,8 +2,14 @@ import { Trans } from '@lingui/macro';
 import { formatPercentage } from 'common/format';
 import { Icon } from 'interface';
 import { Tooltip } from 'interface';
-import Analyzer, { Options } from 'parser/core/Analyzer';
-import Events, { EndChannelEvent, EventType, GlobalCooldownEvent } from 'parser/core/Events';
+import Analyzer, { Options, SELECTED_PLAYER } from 'parser/core/Analyzer';
+import Events, {
+  CastEvent,
+  EndChannelEvent,
+  EventType,
+  FightEndEvent,
+  GlobalCooldownEvent,
+} from 'parser/core/Events';
 import { NumberThreshold, ThresholdStyle, When } from 'parser/core/ParseResults';
 import Haste from 'parser/shared/modules/Haste';
 import Channeling from 'parser/shared/normalizers/Channeling';
@@ -12,6 +18,9 @@ import { QualitativePerformance } from 'parser/ui/QualitativePerformance';
 
 import Abilities from '../../core/modules/Abilities';
 import GlobalCooldown from './GlobalCooldown';
+import { GraphData } from './ResourceGraph';
+import { AutoSizer } from 'react-virtualized';
+import BaseChart, { formatTime } from 'parser/ui/BaseChart';
 
 const DEBUG = false;
 
@@ -249,3 +258,125 @@ class AlwaysBeCasting extends Analyzer {
 }
 
 export default AlwaysBeCasting;
+
+export class AlwaysBeCastingGraph extends AlwaysBeCasting {
+  SLIDING_WINDOW_SIZE: number = 3;
+
+  sliding: number[] = [];
+  graphData: GraphData[] = [];
+
+  constructor(options: Options) {
+    super(options);
+    this.addEventListener(Events.cast.by(SELECTED_PLAYER), this.updateActiveTime);
+    this.addEventListener(Events.fightend, this.updateActiveTime);
+  }
+
+  updateActiveTime(event: CastEvent | FightEndEvent) {
+    if (
+      event.prepull ||
+      ('globalCooldown' in event && !event.globalCooldown) ||
+      this.activeTimePercentage < 0.1
+    ) {
+      return;
+    }
+    const relative_ts = event.timestamp - this.owner.fight.start_time;
+
+    this.sliding.push(this.activeTimePercentage);
+    if (this.sliding.length > this.SLIDING_WINDOW_SIZE) {
+      this.sliding.shift();
+    }
+
+    let amount;
+    // Insert the last percentage raw, instead of the sliding window.
+    if (!('ability' in event)) {
+      amount = this.activeTimePercentage;
+    } else {
+      amount = Math.min(this.sliding.reduce((a, b) => a + b, 0) / this.sliding.length, 1.05);
+    }
+
+    this.graphData.push({ timestamp: relative_ts, amount: amount, kind: 'Active time' });
+  }
+
+  get vegaSpec() {
+    const graphMin = Math.min(...this.graphData.map((d) => d.amount)) - 0.1;
+    const graphMax = Math.max(...this.graphData.map((d) => d.amount)) + 0.1;
+    return {
+      data: {
+        name: 'graphData',
+      },
+      transform: [],
+      encoding: {
+        x: {
+          field: 'timestamp',
+          type: 'quantitative' as const,
+          axis: {
+            labelExpr: formatTime('datum.value'),
+            tickCount: 25,
+            grid: false,
+          },
+          scale: {
+            nice: false,
+          },
+          title: null,
+        },
+        y: {
+          field: 'amount',
+          type: 'quantitative' as const,
+          axis: {
+            grid: true,
+          },
+          scale: {
+            domain: [graphMin, graphMax],
+          },
+        },
+        color: {
+          field: 'kind',
+          type: 'nominal' as const,
+          title: null,
+          legend: {
+            orient: 'top',
+          },
+          scale: {
+            domain: ['Active time'],
+            range: ['#4caf50'],
+          },
+        },
+      },
+      resolve: {
+        scale: { y: 'independent' as const },
+      },
+      mark: {
+        type: 'line' as const,
+        color: undefined,
+        point: true,
+        tooltip: true,
+      },
+      config: {
+        view: {},
+      },
+    };
+  }
+
+  get plot() {
+    return (
+      <div
+        className="graph-container"
+        style={{
+          width: '100%',
+          minHeight: 200,
+        }}
+      >
+        <AutoSizer>
+          {({ width, height }) => (
+            <BaseChart
+              spec={this.vegaSpec}
+              data={{ graphData: this.graphData }}
+              width={width}
+              height={height}
+            />
+          )}
+        </AutoSizer>
+      </div>
+    );
+  }
+}

@@ -10,11 +10,13 @@ import Enemies from 'parser/shared/modules/Enemies';
 import Statistic from 'parser/ui/Statistic';
 
 import Abilities from '../Abilities';
+import SpellUsable from 'parser/shared/modules/SpellUsable';
 
 class StormElemental extends Analyzer {
   static dependencies = {
     abilities: Abilities,
     enemies: Enemies,
+    spellUsable: SpellUsable,
   };
   badFS = 0;
   justEnteredSE = false;
@@ -29,6 +31,7 @@ class StormElemental extends Analyzer {
   };
   protected enemies!: Enemies;
   protected abilities!: Abilities;
+  protected spellUsable!: SpellUsable;
 
   constructor(options: Options) {
     super(options);

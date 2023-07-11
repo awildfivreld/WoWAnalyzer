@@ -6,7 +6,8 @@ import ResourceBreakdown from 'parser/shared/modules/resources/resourcetracker/R
 import Panel from 'parser/ui/Panel';
 import StatisticBox, { STATISTIC_ORDER } from 'parser/ui/StatisticBox';
 
-import MaelstromTracker from './MaelstromTracker.js';
+import MaelstromTracker from './MaelstromTracker';
+import { When } from 'parser/core/ParseResults.js';
 
 const MINOR_THRESHOLD = 0;
 const AVERAGE_THRESHOLD = 0.02;
@@ -16,6 +17,8 @@ class MaelstromDetails extends Analyzer {
   static dependencies = {
     maelstromTracker: MaelstromTracker,
   };
+
+  protected maelstromTracker!: MaelstromTracker;
 
   get wasted() {
     return this.maelstromTracker.wasted || 0;
@@ -57,20 +60,22 @@ class MaelstromDetails extends Analyzer {
     };
   }
 
-  suggestions(when) {
-    when(this.suggestionThresholdsWasted).addSuggestion((suggest, actual, recommended) =>
-      suggest(
-        `You overcapped ${this.wasted} Maelstrom. Always prioritize spending it over avoiding the overcap of any other ability.`,
-      )
-        .icon('spell_shadow_mindflay')
-        .actual(
-          t({
-            id: 'shaman.shared.suggestions.maelstrom.overcapped',
-            message: `${formatPercentage(actual)}% overcapped Maelstrom`,
-          }),
+  suggestions(when: When) {
+    when(this.suggestionThresholdsWasted.actual)
+      .isGreaterThan(this.suggestionThresholdsWasted.isGreaterThan.minor)
+      .addSuggestion((suggest, actual, recommended) =>
+        suggest(
+          `You overcapped ${this.wasted} Maelstrom. Always prioritize spending it over avoiding the overcap of any other ability.`,
         )
-        .recommended(`${formatPercentage(recommended)}% is recommended`),
-    );
+          .icon('spell_shadow_mindflay')
+          .actual(
+            t({
+              id: 'shaman.shared.suggestions.maelstrom.overcapped',
+              message: `${formatPercentage(actual)}% overcapped Maelstrom`,
+            }),
+          )
+          .recommended(`${formatPercentage(recommended)}% is recommended`),
+      );
   }
 
   statistic() {

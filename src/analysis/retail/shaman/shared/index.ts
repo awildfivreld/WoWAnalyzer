@@ -5,6 +5,7 @@ export { default as Maelstrom } from './resources/Maelstrom';
 export { default as MaelstromDetails } from './resources/MaelstromDetails';
 export { default as MaelstromTab } from './resources/MaelstromTab';
 export { default as MaelstromTracker } from './resources/MaelstromTracker';
+export { default as MaelstromGraph } from './resources/MaelstromGraph';
 export { default as AstralShift } from './talents/AstralShift';
 export { default as EarthShield } from './talents/EarthShield';
 export * from './talents/EarthShield';

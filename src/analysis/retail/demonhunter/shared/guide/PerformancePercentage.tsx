@@ -9,7 +9,7 @@ interface Props {
   goodPercentage: number;
   okPercentage: number;
   percentage: number;
-  flatAmount: number;
+  flatAmount?: number;
 }
 const PerformancePercentage = ({
   performance,
@@ -37,7 +37,11 @@ const PerformancePercentage = ({
         </>
       }
     >
-      {formatNumber(flatAmount)} ({formatPercentage(percentage)}%)
+      {(flatAmount && (
+        <>
+          {formatNumber(flatAmount)} ({formatPercentage(percentage)}%)
+        </>
+      )) || <>{formatPercentage(percentage)}%</>}
     </PerformanceStrongWithTooltip>
   );
 };

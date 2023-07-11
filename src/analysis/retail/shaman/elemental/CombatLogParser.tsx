@@ -7,6 +7,7 @@ import {
   MaelstromDetails,
   MaelstromTab,
   MaelstromTracker,
+  MaelstromGraph,
   SpiritWolf,
   StaticCharge,
 } from 'analysis/retail/shaman/shared';
@@ -37,6 +38,7 @@ import Guide from './Guide';
 import ElectrifiedShocks from './modules/talents/ElectrifiedShocks';
 import SpenderWindow from './modules/features/SpenderWindow';
 import EleGlobalCooldown from './modules/core/EleGlobalCooldown';
+import PrecastElementalNormalizer from './modules/normalizers/ElementalPrecastNormalizer';
 
 class CombatLogParser extends CoreCombatLogParser {
   static specModules = {
@@ -74,7 +76,12 @@ class CombatLogParser extends CoreCombatLogParser {
     maelstromTracker: MaelstromTracker,
     maelstromDetails: MaelstromDetails,
     maelstromTab: MaelstromTab,
+    maelstromGraph: MaelstromGraph,
+
+    // Normalizers
     ankhNormalizer: AnkhNormalizer,
+    precastElementalNormalizer: PrecastElementalNormalizer,
+
     checklist: Checklist,
     astralShift: AstralShift,
     callToDominance: CallToDominance,

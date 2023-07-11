@@ -37,20 +37,6 @@ class Buffs extends CoreAuras {
         spellId: Object.keys(BLOODLUST_BUFFS).map((item) => Number(item)),
         timelineHighlight: true,
       },
-      {
-        spellId: TALENTS.STORM_ELEMENTAL_TALENT.id,
-        triggeredBySpellId: TALENTS.STORM_ELEMENTAL_TALENT.id,
-        // It does not seem like there is any event that signals that the elemental has despawned,
-        // so if timelineHighlight is set to true, the highlight will never end.
-        timelineHighlight: false,
-      },
-      {
-        spellId: TALENTS.FIRE_ELEMENTAL_TALENT.id,
-        triggeredBySpellId: TALENTS.FIRE_ELEMENTAL_TALENT.id,
-        // It does not seem like there is any event that signals that the elemental has despawned,
-        // so if timelineHighlight is set to true, the highlight will never end.
-        timelineHighlight: false,
-      },
     ];
   }
 }

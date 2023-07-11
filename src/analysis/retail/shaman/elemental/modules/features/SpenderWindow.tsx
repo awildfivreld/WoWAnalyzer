@@ -8,7 +8,7 @@ import { explanationAndDataSubsection } from 'interface/guide/components/Explana
 import Analyzer, { Options, SELECTED_PLAYER } from 'parser/core/Analyzer';
 import Events, { CastEvent } from 'parser/core/Events';
 import Enemies from 'parser/shared/modules/Enemies';
-import { QualitativePerformance } from 'parser/ui/QualitativePerformance';
+import { PerformanceData, determinePerformance } from '../common/determinePerformance';
 
 interface ActiveSpenderWindow {
   timestamp: number;
@@ -18,12 +18,6 @@ interface ActiveSpenderWindow {
 interface FinishedSpenderWindow extends ActiveSpenderWindow {
   elshocksPresent: boolean;
   sopUse: CastEvent;
-}
-
-interface PerformanceData {
-  perfectPct: number;
-  goodPct: number;
-  okPct: number;
 }
 
 const SOP_SPENDERS = [
@@ -63,36 +57,6 @@ const WRONG_SOP_THRESHOLDS: PerformanceData = {
   goodPct: 0.05,
   okPct: 0.1,
 };
-
-// Probably a better way to do this. Good here might either be 100% or 0%.
-function determinePerformance(
-  performancePct: number,
-  data: PerformanceData,
-): QualitativePerformance {
-  if (data.perfectPct > data.okPct) {
-    if (performancePct >= data.perfectPct) {
-      return QualitativePerformance.Perfect;
-    }
-    if (performancePct >= data.goodPct) {
-      return QualitativePerformance.Good;
-    }
-    if (performancePct >= data.okPct) {
-      return QualitativePerformance.Ok;
-    }
-    return QualitativePerformance.Fail;
-  } else {
-    if (performancePct <= data.perfectPct) {
-      return QualitativePerformance.Perfect;
-    }
-    if (performancePct <= data.goodPct) {
-      return QualitativePerformance.Good;
-    }
-    if (performancePct <= data.okPct) {
-      return QualitativePerformance.Ok;
-    }
-    return QualitativePerformance.Fail;
-  }
-}
 
 class SpenderWindow extends Analyzer {
   static dependencies = {

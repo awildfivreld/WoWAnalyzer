@@ -102,7 +102,7 @@ class Haste extends Analyzer {
     //endregion
 
     //region Shaman
-    [SPELLS.ELEMENTAL_BLAST_HASTE.id]: 0.03,
+    [SPELLS.ELEMENTAL_BLAST_HASTE.id]: 0.06,
     //endregion
 
     //region CLASSIC
@@ -184,6 +184,7 @@ class Haste extends Analyzer {
         `Haste: Current haste: ${formatPercentage(this.current!)}% (haste RATING changed by ${
           event.delta.haste
         } from ${spellName})`,
+        event,
       );
     }
   }
@@ -202,6 +203,7 @@ class Haste extends Analyzer {
           'Current haste:',
           `${formatPercentage(this.current!)}%`,
           `(gained ${formatPercentage(hasteGain)}% from ${event.ability.name})`,
+          event,
         );
     } else {
       debug &&
@@ -209,6 +211,7 @@ class Haste extends Analyzer {
           formatMilliseconds(this.owner.fightDuration),
           'Haste: Applied not recognized buff:',
           event.ability.name,
+          event,
         );
     }
   }

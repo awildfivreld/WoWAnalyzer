@@ -109,6 +109,7 @@ abstract class ResourceGraph extends Analyzer {
 
 /** The type used to compile the data for graphing. */
 export type GraphData = {
+  kind?: string;
   /** Timestamp of the data point */
   timestamp: number;
   /** Amount of resource at the given time */
