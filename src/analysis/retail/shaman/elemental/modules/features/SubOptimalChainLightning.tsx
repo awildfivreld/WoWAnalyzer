@@ -6,8 +6,7 @@ import Analyzer, { Options, SELECTED_PLAYER } from 'parser/core/Analyzer';
 import Events, { CastEvent, DamageEvent } from 'parser/core/Events';
 import { ThresholdStyle, When } from 'parser/core/ParseResults';
 
-// https://stormearthandlava.com/guide/general/priority_list.html
-const TARGETS_FOR_GOOD_CAST = 3;
+const TARGETS_FOR_GOOD_CAST = 2;
 
 class SubOptimalChainLightning extends Analyzer {
   get badCastsPerMinute() {

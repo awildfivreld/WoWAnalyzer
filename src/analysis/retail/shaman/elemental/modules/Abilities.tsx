@@ -49,6 +49,9 @@ class Abilities extends CoreAbilities {
       {
         spell: SPELLS.LAVA_BEAM.id,
         category: SPELL_CATEGORY.ROTATIONAL_AOE,
+        gcd: {
+          base: 1500,
+        },
       },
       {
         spell: TALENTS.EARTHQUAKE_TALENT.id,
@@ -65,16 +68,12 @@ class Abilities extends CoreAbilities {
         gcd: {
           base: 1500,
         },
-        castEfficiency: {
-          suggestion: true,
-          recommendedEfficiency: 0.6,
-        },
       },
       {
         spell: TALENTS.ASCENDANCE_ELEMENTAL_TALENT.id,
         enabled: combatant.hasTalent(TALENTS.ASCENDANCE_ELEMENTAL_TALENT),
         category: SPELL_CATEGORY.COOLDOWNS,
-        cooldown: 180,
+        cooldown: 180 - 30 * combatant.getTalentRank(TALENTS.OATH_OF_THE_FAR_SEER_TALENT),
         gcd: {
           base: 1500,
         },
@@ -85,7 +84,7 @@ class Abilities extends CoreAbilities {
       },
       {
         spell: TALENTS.FIRE_ELEMENTAL_TALENT.id,
-        enabled: !combatant.hasTalent(TALENTS.STORM_ELEMENTAL_TALENT),
+        enabled: combatant.hasTalent(TALENTS.FIRE_ELEMENTAL_TALENT),
         category: SPELL_CATEGORY.COOLDOWNS,
         cooldown: 60 * 2.5,
         gcd: {
@@ -193,12 +192,13 @@ class Abilities extends CoreAbilities {
         gcd: {
           base: 1000,
         },
-        cooldown: 45,
+        cooldown: 30 - combatant.getTalentRank(TALENTS.THUNDERSHOCK_TALENT) * 5,
       },
       {
         spell: TALENTS.TREMOR_TOTEM_TALENT.id,
         enabled: combatant.hasTalent(TALENTS.TREMOR_TOTEM_TALENT),
         category: SPELL_CATEGORY.UTILITY,
+        cooldown: 60,
         gcd: {
           base: 1500,
         },
@@ -221,10 +221,14 @@ class Abilities extends CoreAbilities {
         spell: TALENTS.SPIRITWALKERS_GRACE_TALENT.id,
         enabled: combatant.hasTalent(TALENTS.SPIRITWALKERS_GRACE_TALENT),
         category: SPELL_CATEGORY.UTILITY,
-        cooldown:
-          120 -
-          combatant.getTalentRank(TALENTS.GRACEFUL_SPIRIT_TALENT) * 30 -
-          combatant.getTalentRank(TALENTS.GO_WITH_THE_FLOW_TALENT) * 5,
+        cooldown: 90 - combatant.getTalentRank(TALENTS.GRACEFUL_SPIRIT_TALENT) * 30,
+        gcd: null,
+      },
+      {
+        spell: TALENTS.SPIRIT_WALK_TALENT.id,
+        enabled: combatant.hasTalent(TALENTS.SPIRIT_WALK_TALENT),
+        category: SPELL_CATEGORY.UTILITY,
+        cooldown: 60 - combatant.getTalentRank(TALENTS.GO_WITH_THE_FLOW_TALENT) * 10,
         gcd: null,
       },
       {
@@ -244,6 +248,9 @@ class Abilities extends CoreAbilities {
       {
         spell: SPELLS.GHOST_WOLF.id,
         category: SPELL_CATEGORY.OTHERS,
+        gcd: {
+          base: 1500,
+        },
       },
       {
         spell: SPELLS.BLOODLUST.id,
@@ -256,6 +263,30 @@ class Abilities extends CoreAbilities {
       {
         spell: SPELLS.REINCARNATION.id,
         category: SPELL_CATEGORY.OTHERS,
+      },
+      {
+        spell: SPELLS.HEALING_SURGE.id,
+        category: SPELL_CATEGORY.OTHERS,
+        gcd: {
+          base: 1500,
+        },
+      },
+      {
+        spell: TALENTS.EARTH_SHIELD_TALENT.id,
+        enabled: combatant.hasTalent(TALENTS.EARTH_SHIELD_TALENT),
+        category: SPELL_CATEGORY.DEFENSIVE,
+        gcd: {
+          base: 1500,
+        },
+      },
+      {
+        spell: TALENTS.WIND_RUSH_TOTEM_TALENT.id,
+        enabled: combatant.hasTalent(TALENTS.WIND_RUSH_TOTEM_TALENT),
+        cooldown: 120,
+        category: SPELL_CATEGORY.UTILITY,
+        gcd: {
+          base: 1500,
+        },
       },
     ];
   }

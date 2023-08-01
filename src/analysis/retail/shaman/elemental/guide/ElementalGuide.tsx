@@ -80,6 +80,7 @@ const CooldownSection = ({ info }: GuideProps<typeof CombatLogParser>) => (
       (talent) =>
         info.combatant.hasTalent(talent) && (
           <CastEfficiencyBar
+            key={talent.id}
             spellId={talent.id}
             gapHighlightMode={GapHighlight.FullCooldown}
             useThresholds
@@ -119,6 +120,7 @@ const DefensiveSection = ({ info }: GuideProps<typeof CombatLogParser>) => (
       (talent) =>
         info.combatant.hasTalent(talent) && (
           <CastEfficiencyBar
+            key={talent.id}
             spellId={talent.id}
             gapHighlightMode={GapHighlight.FullCooldown}
             useThresholds

@@ -102,7 +102,7 @@ class Haste extends Analyzer {
     //endregion
 
     //region Shaman
-    [SPELLS.ELEMENTAL_BLAST_HASTE.id]: 0.03,
+    [SPELLS.ELEMENTAL_BLAST_HASTE.id]: 0.06,
     //endregion
 
     //region CLASSIC

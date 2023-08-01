@@ -15,7 +15,7 @@ import CoreCombatLogParser from 'parser/core/CombatLogParser';
 import Abilities from './modules/Abilities';
 import Buffs from './modules/Buffs';
 import Checklist from './modules/checklist/Module';
-import LavaSurge from './modules/core/LavaSurge';
+import LavaSurge from './modules/talents/LavaSurge';
 import AlwaysBeCasting from './modules/features/AlwaysBeCasting';
 import CancelledCasts from './modules/features/CancelledCasts';
 import SubOptimalChainLightning from './modules/features/SubOptimalChainLightning';
@@ -41,19 +41,19 @@ class CombatLogParser extends CoreCombatLogParser {
     // Features
     abilities: Abilities,
     flameShock: FlameShock,
-    lavaSurge: LavaSurge,
     buffs: Buffs,
     cancelledCasts: CancelledCasts,
     alwaysBeCasting: AlwaysBeCasting,
     subOptimalChainLightning: SubOptimalChainLightning,
 
     // Talents
+    lavaSurge: LavaSurge,
     aftershock: Aftershock,
     elementalBlast: ElementalBlast,
     spiritWolf: SpiritWolf,
     earthShield: EarthShield,
-    elementalOrbit: ElementalOrbit,
-    earthenHarmony: EarthenHarmony,
+    elementalOrbit: ElementalOrbit, // Required to make the earth shield module not crash
+    earthenHarmony: EarthenHarmony, // Required to make the earth shield module not crash
     staticCharge: StaticCharge,
     masterOfTheElements: MasterOfTheElements,
     stormElemental: StormElemental,
